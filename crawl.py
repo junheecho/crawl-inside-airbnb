@@ -28,22 +28,22 @@ def download(files, only_latest=False):
     tokens = uri.split('/')
 
     country, province, city, date, data_type, file_name = tokens
-    if only_latest and city not in latest_by_city:
-      latest_by_city[city] = date
-    if only_latest and latest_by_city[city] > date:
+    if only_latest and city in latest_by_city and latest_by_city[city] > date:
       continue
 
     dir_name = '/'.join([DIR, city, date, data_type])
     file_path = '/'.join([dir_name, file_name])
 
-    pathlib.Path(dir_name).mkdir(parents=True, exist_ok=True)
-    with open(file_path, 'wb') as f:
-      conn = http.client.HTTPConnection(DATA_DOMAIN)
-      conn.request('GET', '/' + uri)
-      res = conn.getresponse()
-      f.write(res.read())
-      print('[', i, '/', len(files), ']', res.status, res.reason, uri)
-      conn.close()
+    conn = http.client.HTTPConnection(DATA_DOMAIN)
+    conn.request('GET', '/' + uri)
+    res = conn.getresponse()
+    if res.status == 200:
+      pathlib.Path(dir_name).mkdir(parents=True, exist_ok=True)
+      with open(file_path, 'wb') as f:
+        f.write(res.read())
+      latest_by_city[city] = date
+    print('[', i, '/', len(files), ']', res.status, res.reason, uri)
+    conn.close()
 
 if __name__ == '__main__':
   files = crawl_file_list()
