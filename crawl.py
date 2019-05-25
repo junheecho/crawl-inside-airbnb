@@ -1,12 +1,14 @@
 import http.client
 import re
 import pathlib
+import urllib
+import copy
 
 DOMAIN = 'insideairbnb.com'
 LIST_URI = '/get-the-data.html'
 DATA_DOMAIN = 'data.insideairbnb.com'
 PATTERN = r'http://data.insideairbnb.com/([^\'\"]*)'
-DIR = 'data/'
+DIR = 'data'
 
 def crawl_file_list():
   conn = http.client.HTTPConnection(DOMAIN)
@@ -18,17 +20,31 @@ def crawl_file_list():
 
   return re.findall(PATTERN, html.decode('utf-8'))
 
-if __name__ == '__main__':
-  files = crawl_file_list()
+def download(files, only_latest=False):
+  files = copy.copy(files)
+  files.sort(reverse=True)
+  latest_by_city = {}
   for i, uri in enumerate(files, 1):
     tokens = uri.split('/')
-    dir_name, file_name = '/'.join(tokens[:-1]), tokens[-1]
 
-    pathlib.Path(DIR + dir_name).mkdir(parents=True, exist_ok=True)
-    with open(DIR + uri, 'wb') as f:
+    country, province, city, date, data_type, file_name = tokens
+    if only_latest and city not in latest_by_city:
+      latest_by_city[city] = date
+    if only_latest and latest_by_city[city] > date:
+      continue
+
+    dir_name = '/'.join([DIR, city, date, data_type])
+    file_path = '/'.join([dir_name, file_name])
+
+    pathlib.Path(dir_name).mkdir(parents=True, exist_ok=True)
+    with open(file_path, 'wb') as f:
       conn = http.client.HTTPConnection(DATA_DOMAIN)
       conn.request('GET', '/' + uri)
       res = conn.getresponse()
       f.write(res.read())
       print('[', i, '/', len(files), ']', res.status, res.reason, uri)
       conn.close()
+
+if __name__ == '__main__':
+  files = crawl_file_list()
+  download(files, only_latest=True)
